@@ -1,8 +1,7 @@
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import String, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from app.db.base import Base
 
@@ -10,7 +9,7 @@ from app.db.base import Base
 class Trainer(Base):
     __tablename__ = "trainer"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     firebase_uid: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String, index=True, nullable=False)
     name: Mapped[str | None] = mapped_column(String, nullable=True)

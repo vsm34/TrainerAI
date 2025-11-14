@@ -1,8 +1,7 @@
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, Numeric, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import String, Text, Integer, ForeignKey, Numeric, Boolean, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from app.db.base import Base
 
@@ -10,10 +9,10 @@ from app.db.base import Base
 class Workout(Base):
     __tablename__ = "workout"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    trainer_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("trainer.id"), nullable=False)
-    client_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("client.id"), nullable=True)
-    template_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("template.id"), nullable=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    trainer_id: Mapped[str] = mapped_column(String(36), ForeignKey("trainer.id"), nullable=False)
+    client_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("client.id"), nullable=True)
+    template_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("template.id"), nullable=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String)
@@ -32,8 +31,8 @@ class Workout(Base):
 class WorkoutBlock(Base):
     __tablename__ = "workout_block"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    workout_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("workout.id"), nullable=False)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workout_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout.id"), nullable=False)
     block_type: Mapped[str] = mapped_column(String)
     sequence_index: Mapped[int] = mapped_column(Integer)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -46,9 +45,9 @@ class WorkoutBlock(Base):
 class WorkoutSet(Base):
     __tablename__ = "workout_set"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    workout_block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("workout_block.id"), nullable=False)
-    exercise_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("exercise.id"), nullable=False)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workout_block_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout_block.id"), nullable=False)
+    exercise_id: Mapped[str] = mapped_column(String(36), ForeignKey("exercise.id"), nullable=False)
     set_index: Mapped[int] = mapped_column(Integer)
     target_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     target_reps_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -71,8 +70,8 @@ class WorkoutSet(Base):
 class CompletedSet(Base):
     __tablename__ = "completed_set"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    workout_set_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("workout_set.id"), nullable=False)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workout_set_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout_set.id"), nullable=False)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actual_load: Mapped[float | None] = mapped_column(Numeric, nullable=True)
     actual_rpe: Mapped[float | None] = mapped_column(Numeric, nullable=True)

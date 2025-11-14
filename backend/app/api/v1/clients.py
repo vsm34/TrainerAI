@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
 from typing import List
 
 from fastapi import APIRouter, HTTPException, status
@@ -45,9 +44,9 @@ async def create_client(
 
 
 def _get_client_or_404(
-    client_id: UUID,
+    client_id: str,
     db: Session,
-    trainer_id: UUID,
+    trainer_id: str,
 ) -> Client:
     result = db.execute(
         select(Client).where(
@@ -66,7 +65,7 @@ def _get_client_or_404(
 
 @router.get("/{client_id}", response_model=ClientRead)
 async def get_client(
-    client_id: UUID,
+    client_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> ClientRead:
@@ -75,7 +74,7 @@ async def get_client(
 
 @router.put("/{client_id}", response_model=ClientRead)
 async def update_client(
-    client_id: UUID,
+    client_id: str,
     payload: ClientUpdate,
     db: DBSessionDep,
     current_trainer: TrainerDep,
@@ -93,7 +92,7 @@ async def update_client(
 
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
-    client_id: UUID,
+    client_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> None:

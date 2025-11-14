@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
 from datetime import datetime
 from typing import Any
 
@@ -30,8 +29,8 @@ class ClientUpdate(BaseModel):
 
 
 class ClientRead(ORMModel, ClientBase):
-    id: UUID
-    trainer_id: UUID
+    id: str
+    trainer_id: str
     created_at: datetime
     updated_at: datetime
 

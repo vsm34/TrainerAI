@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
 from typing import List
 from datetime import datetime, time
 
@@ -20,7 +19,7 @@ router = APIRouter()
 async def list_workouts(
     db: DBSessionDep,
     current_trainer: TrainerDep,
-    client_id: UUID | None = Query(None),
+    client_id: str | None = Query(None),
     status_filter: str | None = Query(None),
 ) -> list[WorkoutRead]:
     stmt = select(Workout).where(Workout.trainer_id == current_trainer.id)
@@ -58,9 +57,9 @@ async def create_workout(
 
 
 def _get_workout_or_404(
-    workout_id: UUID,
+    workout_id: str,
     db: Session,
-    trainer_id: UUID,
+    trainer_id: str,
 ) -> Workout:
     result = db.execute(
         select(Workout).where(
@@ -79,7 +78,7 @@ def _get_workout_or_404(
 
 @router.get("/{workout_id}", response_model=WorkoutRead)
 async def get_workout(
-    workout_id: UUID,
+    workout_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> WorkoutRead:
@@ -88,7 +87,7 @@ async def get_workout(
 
 @router.put("/{workout_id}", response_model=WorkoutRead)
 async def update_workout(
-    workout_id: UUID,
+    workout_id: str,
     payload: WorkoutUpdate,
     db: DBSessionDep,
     current_trainer: TrainerDep,
@@ -111,7 +110,7 @@ async def update_workout(
 
 @router.delete("/{workout_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workout(
-    workout_id: UUID,
+    workout_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -37,8 +36,8 @@ class ExerciseUpdate(BaseModel):
 
 
 class ExerciseRead(ORMModel, ExerciseBase):
-    id: UUID
-    trainer_id: UUID | None = None
+    id: str
+    trainer_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

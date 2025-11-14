@@ -1,55 +1,63 @@
-# --- Python / FastAPI ---
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-env/
-.venv/
-venv/
-*.env
-.env.*
-.env.local
-.env.production
-.env.development
-
-# Alembic migrations (we will add later)
-alembic.ini
-alembic/
-migrations/
-
-# SQLite (if ever used)
-*.db
-*.sqlite3
-
-# pycache at all levels
-**/__pycache__/
-
-# --- Node / Next.js ---
-node_modules/
-.npm/
-.next/
-dist/
-out/
-npm-debug.log
-yarn-debug.log
-yarn-error.log
-
-# Build artifacts
-*.log
-*.pid
-*.seed
-
-# Local firebase credentials (VERY IMPORTANT)
-firebase-adminsdk.json
-serviceAccountKey.json
-
-# --- Cursor files ---
-.cursor/
-.project/
-*.cursorignore
-
-# --- OS / Editor ---
+# ---------------------------------------------
+# Global
+# ---------------------------------------------
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+*.log
+*.tmp
+*.cache
+__pycache__/
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------
+# Python / FastAPI backend
+# ---------------------------------------------
+backend/.venv/
+backend/venv/
+backend/env/
+backend/*.pyc
+backend/**/*.pyc
+backend/.coverage
+backend/coverage/
+backend/htmlcov/
+backend/.pytest_cache/
+backend/.mypy_cache/
+
+# SQLite dev database
+backend/trainerai.db
+backend/*.db
+
+# Firebase Admin private key (never commit!)
+backend/firebase-adminsdk.json
+
+# Local build artifacts
+backend/dist/
+backend/build/
+backend/.ruff_cache/
+
+# ---------------------------------------------
+# Node / Next.js frontend
+# ---------------------------------------------
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/coverage/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.production.local
+frontend/.env.test.local
+
+# ---------------------------------------------
+# Cursor files
+# ---------------------------------------------
+.cursor/
+.cursorignore

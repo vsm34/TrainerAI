@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -13,9 +12,8 @@ class WorkoutBase(BaseModel):
     status: str = "draft"  # "draft", "planned", "in_progress", "completed"
     notes: Optional[str] = None
     freeform_log: Optional[str] = None
-    client_id: Optional[int] = None
-    # If your Template PK is int, change this to Optional[int]
-    template_id: Optional[UUID] = None
+    client_id: Optional[str] = None
+    template_id: Optional[str] = None
 
 
 class WorkoutCreate(WorkoutBase):
@@ -28,12 +26,12 @@ class WorkoutUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     freeform_log: Optional[str] = None
-    client_id: Optional[int] = None
-    template_id: Optional[UUID] = None  # or Optional[int] if templates use int PK
+    client_id: Optional[str] = None
+    template_id: Optional[str] = None
 
 
 class WorkoutRead(ORMModel, WorkoutBase):
-    id: int
-    trainer_id: int
+    id: str
+    trainer_id: str
     created_at: datetime
     updated_at: datetime

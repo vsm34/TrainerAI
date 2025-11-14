@@ -1,8 +1,7 @@
-from sqlalchemy import Column, String, Text, Boolean, ForeignKey, Integer, UniqueConstraint, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, ARRAY
+from sqlalchemy import String, Text, Boolean, ForeignKey, Integer, UniqueConstraint, DateTime, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from app.db.base import Base
 
@@ -10,11 +9,11 @@ from app.db.base import Base
 class Exercise(Base):
     __tablename__ = "exercise"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    trainer_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("trainer.id"), nullable=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    trainer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("trainer.id"), nullable=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     primary_muscle_id: Mapped[int] = mapped_column(Integer, ForeignKey("muscle.id"), nullable=False)
-    secondary_muscle_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
+    secondary_muscle_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     equipment: Mapped[str] = mapped_column(String)
     movement_pattern: Mapped[str] = mapped_column(String)
     unilateral: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -39,7 +38,7 @@ class Exercise(Base):
 class ExerciseTag(Base):
     __tablename__ = "exercise_tag"
 
-    exercise_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("exercise.id"), primary_key=True)
+    exercise_id: Mapped[str] = mapped_column(String(36), ForeignKey("exercise.id"), primary_key=True)
     tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("tag.id"), primary_key=True)
 
     # Relationships

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -58,9 +57,9 @@ async def create_exercise(
 
 
 def _get_owned_exercise_or_404(
-    exercise_id: UUID,
+    exercise_id: str,
     db: Session,
-    trainer_id: UUID,
+    trainer_id: str,
 ) -> Exercise:
     result = db.execute(
         select(Exercise).where(
@@ -79,7 +78,7 @@ def _get_owned_exercise_or_404(
 
 @router.get("/{exercise_id}", response_model=ExerciseRead)
 async def get_exercise(
-    exercise_id: UUID,
+    exercise_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> ExerciseRead:
@@ -103,7 +102,7 @@ async def get_exercise(
 
 @router.put("/{exercise_id}", response_model=ExerciseRead)
 async def update_exercise(
-    exercise_id: UUID,
+    exercise_id: str,
     payload: ExerciseUpdate,
     db: DBSessionDep,
     current_trainer: TrainerDep,
@@ -121,7 +120,7 @@ async def update_exercise(
 
 @router.delete("/{exercise_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_exercise(
-    exercise_id: UUID,
+    exercise_id: str,
     db: DBSessionDep,
     current_trainer: TrainerDep,
 ) -> None:

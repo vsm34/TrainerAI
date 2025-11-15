@@ -49,17 +49,17 @@ async def get_current_trainer(
             detail="Firebase token missing uid",
         )
 
-    email = decoded.get("email")
-    name = decoded.get("name")
-
-    # lookup
+    # Lookup existing trainer by firebase_uid
     result = db.execute(
         select(Trainer).where(Trainer.firebase_uid == firebase_uid)
     )
     trainer = result.scalar_one_or_none()
 
-    # auto-create on first login
+    # If trainer doesn't exist, create a new one
     if trainer is None:
+        email = decoded.get("email")
+        name = decoded.get("name")
+        
         trainer = Trainer(
             firebase_uid=firebase_uid,
             email=email,

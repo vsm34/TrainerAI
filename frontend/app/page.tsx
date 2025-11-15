@@ -3,6 +3,7 @@
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
+import { DebugTokenButton } from "@/components/DebugTokenButton";
 
 export default function DashboardPage() {
   return (
@@ -13,6 +14,7 @@ export default function DashboardPage() {
           Welcome to TrainerAI. Use the sidebar to manage clients, exercises,
           workouts, and generate AI-assisted plans.
         </p>
+        <DebugTokenButton />
       </AppShell>
     </ProtectedRoute>
   );

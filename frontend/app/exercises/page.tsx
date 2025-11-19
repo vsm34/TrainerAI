@@ -17,7 +17,11 @@ type Exercise = {
   trainer_id?: number | null;
 };
 
-async function fetchExercises(): Promise<Exercise[]> {
+type ExerciseList = {
+  items: Exercise[];
+};
+
+async function fetchExercises(): Promise<ExerciseList | Exercise[]> {
   const res = await api.get("/api/v1/exercises");
   return res.data;
 }
@@ -27,6 +31,9 @@ export default function ExercisesPage() {
     queryKey: ["exercises"],
     queryFn: fetchExercises,
   });
+
+  // Normalize the data to handle both array and object formats
+  const exercises = Array.isArray(data) ? data : data?.items ?? [];
 
   return (
     <ProtectedRoute>
@@ -38,9 +45,11 @@ export default function ExercisesPage() {
 
         {isLoading ? (
           <p className="text-sm text-slate-400">Loading exercises...</p>
+        ) : exercises.length === 0 ? (
+          <p className="text-sm text-slate-400">No exercises found.</p>
         ) : (
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {data?.map((ex) => (
+            {exercises.map((ex) => (
               <div
                 key={ex.id}
                 className="rounded border border-slate-800 bg-slate-900 px-4 py-3 text-sm"

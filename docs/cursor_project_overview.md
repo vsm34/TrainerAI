@@ -1,4 +1,4 @@
-# 📘 TrainerAI – Cursor Project Overviewsure 
+# 📘 TrainerAI – Cursor Project Overview
 
 Last updated: 2025-11-18
 
@@ -369,3 +369,4 @@ Generate AI workouts
 Tailor workouts to preferences, equipment, injuries
 
 Deploy the platform publicly
+

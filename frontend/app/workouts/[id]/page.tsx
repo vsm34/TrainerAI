@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
+import { parseISO, format } from "date-fns";
 
 type Workout = {
   id: number;
@@ -27,6 +28,14 @@ type WorkoutUpdate = {
   notes?: string;
   freeform_log?: string;
   status?: string;
+  date?: string;
+};
+
+// Helper to format workout dates as date-only values (no timezone shift)
+const formatWorkoutDate = (value?: string | null) => {
+  if (!value) return "";
+  // Interpret as a local calendar date and print as MM/DD/YYYY
+  return format(parseISO(value), "MM/dd/yyyy");
 };
 
 export default function WorkoutDetailPage() {
@@ -41,12 +50,20 @@ export default function WorkoutDetailPage() {
 
   const { register, handleSubmit, reset } = useForm<WorkoutUpdate>();
 
+  // Helper to convert ISO datetime to YYYY-MM-DD
+  function isoToDateOnly(iso?: string | null): string {
+    if (!iso) return "";
+    // iso is like "2025-11-20T04:08:13.395Z" or similar
+    return iso.split("T")[0] ?? "";
+  }
+
   useEffect(() => {
     if (data) {
       reset({
         notes: data.notes ?? "",
         freeform_log: data.freeform_log ?? "",
         status: data.status ?? "planned",
+        date: isoToDateOnly(data.date),
       });
     }
   }, [data, reset]);
@@ -61,7 +78,18 @@ export default function WorkoutDetailPage() {
   });
 
   const onSubmit = (values: WorkoutUpdate) => {
-    mutation.mutate(values);
+    const payload: any = {
+      status: values.status,
+      notes: values.notes,
+      freeform_log: values.freeform_log,
+    };
+
+    if (values.date) {
+      // Send YYYY-MM-DD string; backend will convert to datetime
+      payload.date = values.date;
+    }
+
+    mutation.mutate(payload);
   };
 
   return (
@@ -74,12 +102,23 @@ export default function WorkoutDetailPage() {
             <div>
               <h2 className="text-2xl font-semibold">{data.title}</h2>
               <p className="text-sm text-slate-400">
-                {new Date(data.date).toLocaleDateString()} ·{" "}
+                {formatWorkoutDate(data.date)} ·{" "}
                 {data.status ?? "planned"}
               </p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-sm">
+              <div>
+                <label className="mb-1 block text-xs text-slate-300">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+                  {...register("date")}
+                />
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs text-slate-300">
                   Status

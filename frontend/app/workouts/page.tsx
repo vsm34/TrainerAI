@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
 import Link from "next/link";
+import { parseISO, format } from "date-fns";
 
 type Workout = {
   id: number;
@@ -19,6 +20,13 @@ async function fetchWorkouts(): Promise<Workout[]> {
   const res = await api.get("/api/v1/workouts");
   return res.data;
 }
+
+// Helper to format workout dates as date-only values (no timezone shift)
+const formatWorkoutDate = (value?: string | null) => {
+  if (!value) return "";
+  // Interpret as a local calendar date and print as MM/DD/YYYY
+  return format(parseISO(value), "MM/dd/yyyy");
+};
 
 export default function WorkoutsPage() {
   const { data, isLoading } = useQuery({
@@ -53,7 +61,7 @@ export default function WorkoutsPage() {
                   <div>
                     <p className="font-medium">{w.title}</p>
                     <p className="text-xs text-slate-400">
-                      {new Date(w.date).toLocaleDateString()} ·{" "}
+                      {formatWorkoutDate(w.date)} ·{" "}
                       {w.status ?? "draft"}
                     </p>
                   </div>

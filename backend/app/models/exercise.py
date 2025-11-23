@@ -1,6 +1,5 @@
-from sqlalchemy import String, Text, Boolean, ForeignKey, Integer, UniqueConstraint, DateTime, JSON
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from datetime import datetime
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import relationship
 from uuid import uuid4
 
 from app.db.base import Base
@@ -9,26 +8,41 @@ from app.db.base import Base
 class Exercise(Base):
     __tablename__ = "exercise"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    trainer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("trainer.id"), nullable=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    primary_muscle_id: Mapped[int] = mapped_column(Integer, ForeignKey("muscle.id"), nullable=False)
-    secondary_muscle_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
-    equipment: Mapped[str] = mapped_column(String)
-    movement_pattern: Mapped[str] = mapped_column(String)
-    unilateral: Mapped[bool] = mapped_column(Boolean, default=False)
-    skill_level: Mapped[str] = mapped_column(String)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid4()))
+    trainer_id = Column(String(36), ForeignKey("trainer.id"), nullable=False, index=True)
 
-    # Relationships
-    trainer: Mapped["Trainer | None"] = relationship("Trainer", back_populates="exercises")
-    primary_muscle: Mapped["Muscle"] = relationship("Muscle", back_populates="primary_exercises")
-    tags: Mapped[list["ExerciseTag"]] = relationship("ExerciseTag", back_populates="exercise")
-    workout_sets: Mapped[list["WorkoutSet"]] = relationship("WorkoutSet", back_populates="exercise")
-    template_sets: Mapped[list["TemplateSet"]] = relationship("TemplateSet", back_populates="exercise")
+    name = Column(String, nullable=False)
+    primary_muscle_id = Column(Integer, ForeignKey("muscle.id"), nullable=False)
+
+    equipment = Column(String, nullable=False)
+    movement_pattern = Column(String, nullable=True)
+    skill_level = Column(String, nullable=False, default="beginner")
+    unilateral = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    notes = Column(String, nullable=True)
+
+    # ✅ relationships
+    trainer = relationship("Trainer", back_populates="exercises")
+    primary_muscle = relationship("Muscle", back_populates="exercises")
+
+    tags = relationship(
+        "ExerciseTag",
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+    )
+
+    template_sets = relationship(
+        "TemplateSet",
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+    )
+
+    workout_sets = relationship(
+        "WorkoutSet",
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "trainer_id", name="uq_exercise_name_trainer"),
@@ -38,10 +52,14 @@ class Exercise(Base):
 class ExerciseTag(Base):
     __tablename__ = "exercise_tag"
 
-    exercise_id: Mapped[str] = mapped_column(String(36), ForeignKey("exercise.id"), primary_key=True)
-    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("tag.id"), primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    exercise_id = Column(String(36), ForeignKey("exercise.id"), nullable=False)
+    tag_id = Column(Integer, ForeignKey("tag.id"), nullable=False)
 
-    # Relationships
-    exercise: Mapped["Exercise"] = relationship("Exercise", back_populates="tags")
-    tag: Mapped["Tag"] = relationship("Tag", back_populates="exercises")
+    exercise = relationship("Exercise", back_populates="tags")
+    tag = relationship("Tag", back_populates="exercise_links")
+
+    __table_args__ = (
+        UniqueConstraint("exercise_id", "tag_id", name="uix_exercise_tag"),
+    )
 

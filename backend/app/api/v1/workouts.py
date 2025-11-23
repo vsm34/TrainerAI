@@ -9,8 +9,17 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import DBSessionDep, TrainerDep
 from app.models.workout import Workout, WorkoutBlock, WorkoutSet
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, ExerciseTag
+from app.models.muscle import Muscle
+from app.models.tag import Tag
+from app.models.client import Client
 from app.schemas.workout import WorkoutCreate, WorkoutRead, WorkoutUpdate
+from app.schemas.ai_workout import (
+    WorkoutGenerateRequest,
+    WorkoutGenerateResponse,
+    AIWorkoutPlan,
+)
+from app.core.ai_client import generate_workout_plan
 
 
 router = APIRouter()
@@ -144,6 +153,215 @@ async def create_workout(
     )
     workout = result.scalar_one()
     return workout
+
+
+@router.post("/generate", response_model=WorkoutGenerateResponse)
+async def generate_workout(
+    payload: WorkoutGenerateRequest,
+    db: DBSessionDep,
+    current_trainer: TrainerDep,
+) -> WorkoutGenerateResponse:
+    """
+    Generate an AI workout plan using Gemini.
+    Returns a structured workout plan that can be previewed and optionally saved.
+    """
+    # Fetch client if provided
+    client = None
+    if payload.client_id:
+        result = db.execute(
+            select(Client).where(
+                Client.id == payload.client_id,
+                Client.trainer_id == current_trainer.id,
+            )
+        )
+        client = result.scalar_one_or_none()
+        if client is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Client not found",
+            )
+
+    # Fetch all active exercises for this trainer with relationships
+    stmt = (
+        select(Exercise)
+        .where(
+            Exercise.trainer_id == current_trainer.id,
+            Exercise.is_active == True,
+        )
+        .options(
+            selectinload(Exercise.primary_muscle),
+            # Load association rows and then the Tag objects
+            selectinload(Exercise.tags).selectinload(ExerciseTag.tag),
+        )
+        .order_by(Exercise.name)
+    )
+
+    result = db.execute(stmt)
+    exercises = result.scalars().unique().all()
+
+    if not exercises:
+        # Either tell the trainer to seed/create exercises, or optionally auto-seed here.
+        # For now, keep the explicit error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No exercises available. Please create exercises or call /exercises/seed-defaults before generating workouts.",
+        )
+
+    # Format exercises for the prompt
+    # Derive subset from muscle name (simplified mapping based on taxonomy_reference.md)
+    muscle_name_to_subset = {
+        "Shoulders": "upper",
+        "Chest": "upper",
+        "Tricep": "upper",
+        "Bicep": "upper",
+        "Back": "upper",
+        "Quads": "lower",
+        "Hamstring": "lower",
+        "Glutes": "lower",
+        "Lower Abs": "core",
+        "Upper Abs": "core",
+        "Obliques": "core",
+    }
+    
+    exercises_list = []
+    for ex in exercises:
+        # Derive subset from primary muscle name
+        subset = "unknown"
+        if ex.primary_muscle:
+            muscle_name = ex.primary_muscle.name
+            # Try exact match first, then case-insensitive
+            subset = muscle_name_to_subset.get(muscle_name) or muscle_name_to_subset.get(
+                muscle_name.title()
+            ) or "unknown"
+        
+        exercise_data = {
+            "id": ex.id,
+            "name": ex.name,
+            "subset": subset,
+            "primary_muscle_id": ex.primary_muscle_id,
+            "movement_pattern": ex.movement_pattern,
+            "equipment": ex.equipment,
+            "tags": [tag.tag.name for tag in ex.tags] if ex.tags else [],
+        }
+        exercises_list.append(exercise_data)
+
+    # Build the prompt according to docs/ai_prompt_design.md
+    prompt_parts = [
+        "You are TrainerAI, an expert workout generator that creates structured workout plans",
+        "according to a strict JSON schema.",
+        "",
+        "### RULES",
+        "- USE ONLY the exercises provided in the list.",
+        "- NEVER hallucinate new exercises.",
+        "- ALWAYS match the provided schema exactly.",
+        "- Names must exactly match exercise.name and exercise.id.",
+        "- Ensure each block has valid exercises and set prescriptions.",
+        "- Return ONLY JSON. No commentary.",
+        "",
+        "### CONTEXT",
+    ]
+
+    # Add client context if available
+    if client:
+        prompt_parts.append(f"Client name: {client.name}")
+        if client.notes:
+            prompt_parts.append(f"Client notes: {client.notes}")
+        if client.injury_flags:
+            prompt_parts.append(f"Injuries: {', '.join(client.injury_flags)}")
+        if client.preferences_json:
+            prompt_parts.append(f"Preferences: {client.preferences_json}")
+    else:
+        prompt_parts.append("Client: Not specified")
+
+    # Add workout constraints
+    prompt_parts.append(f"Focus subsets: {', '.join(payload.focus_subsets)}")
+    if payload.session_length_minutes:
+        prompt_parts.append(f"Session length: {payload.session_length_minutes} minutes")
+    if payload.equipment_available:
+        prompt_parts.append(f"Equipment available: {', '.join(payload.equipment_available)}")
+    if payload.notes:
+        prompt_parts.append(f"Trainer notes: {payload.notes}")
+
+    # Add schema definition
+    prompt_parts.extend([
+        "",
+        "### SCHEMA",
+        "The output must be a JSON object matching this structure:",
+        "{",
+        '  "name": "string (workout name)",',
+        '  "focus_subsets": ["upper" | "lower" | "core" | "full_body" | "conditioning"],',
+        '  "muscles_targeted": ["string (muscle names)"],',
+        '  "blocks": [',
+        "    {",
+        '      "block_type": "straight" | "superset" | "circuit",',
+        '      "rest_seconds": number,',
+        '      "exercises": [',
+        "        {",
+        '          "exercise_id": "string (must match an exercise.id from the list)",',
+        '          "sets": [',
+        "            {",
+        '              "reps": number,',
+        '              "weight": number | null,',
+        '              "notes": "string | null"',
+        "            }",
+        "          ]",
+        "        }",
+        "      ]",
+        "    }",
+        "  ]",
+        "}",
+        "",
+        "### AVAILABLE EXERCISES",
+    ])
+
+    # Add exercises list
+    for ex in exercises_list:
+        ex_str = f"- id: {ex['id']}, name: {ex['name']}, subset: {ex['subset']}, "
+        ex_str += f"primary_muscle_id: {ex['primary_muscle_id']}, "
+        ex_str += f"movement_pattern: {ex['movement_pattern']}, equipment: {ex['equipment']}"
+        if ex['tags']:
+            ex_str += f", tags: {', '.join(ex['tags'])}"
+        prompt_parts.append(ex_str)
+
+    # Add instruction
+    prompt_parts.extend([
+        "",
+        "### INSTRUCTION",
+        f"Generate exactly 1 workout plan in valid JSON that follows:",
+        f"- Focus on: {', '.join(payload.focus_subsets)}",
+        f"- Include 4-6 exercises total",
+        f"- 3-4 sets per exercise unless it's a circuit",
+        f"- Rest: 60-120 seconds between sets",
+        "",
+        "RETURN ONLY VALID JSON.",
+    ])
+
+    prompt = "\n".join(prompt_parts)
+
+    # Call Gemini
+    try:
+        raw_plan = await generate_workout_plan(prompt)
+    except ValueError as e:
+        # Typically GEMINI_API_KEY not set
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError as e:
+        # Gemini or JSON related issues
+        raise HTTPException(status_code=502, detail=str(e))
+
+    # Validate with Pydantic schema
+    try:
+        plan = AIWorkoutPlan.model_validate(raw_plan)
+    except Exception as e:
+        # Log validation error for debugging (but don't expose internal details)
+        import traceback
+        print(f"[ERROR] Workout plan validation failed: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=502,
+            detail=f"Generated workout plan failed validation: {str(e)}",
+        )
+
+    return WorkoutGenerateResponse(plan=plan)
 
 
 def _get_workout_or_404(

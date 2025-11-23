@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -39,10 +39,19 @@ class ExerciseUpdate(BaseModel):
 class ExerciseRead(ORMModel, ExerciseBase):
     id: str
     trainer_id: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class ExerciseList(BaseModel):
     items: List[ExerciseRead]
+
+
+class SeedDefaultsResponse(BaseModel):
+    created: int
+    skipped: int
+    total_after: int
+
+    class Config:
+        orm_mode = True
 

@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import DBSessionDep, TrainerDep
 from app.models.exercise import Exercise
-from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate, ExerciseList
+from app.schemas.exercise import (
+    ExerciseCreate,
+    ExerciseRead,
+    ExerciseUpdate,
+    ExerciseList,
+    SeedDefaultsResponse,
+)
+from app.services.exercise_seed import seed_default_exercises_for_trainer
 
 
 router = APIRouter()
@@ -110,6 +117,34 @@ async def delete_exercise(
     exercise = _get_exercise_or_404(exercise_id, db, current_trainer.id)
     db.delete(exercise)
     db.commit()
+
+
+@router.post("/seed-defaults", response_model=SeedDefaultsResponse)
+def seed_default_exercises(
+    db: DBSessionDep,
+    current_trainer: TrainerDep,
+):
+    """
+    Seed default exercises for the current trainer.
+    Safe to call multiple times – exercises are de-duplicated by (trainer_id, name).
+    """
+    try:
+        created, skipped = seed_default_exercises_for_trainer(db, current_trainer.id)
+    except Exception as exc:
+        # Log and surface as 500
+        import traceback
+        print(f"[ERROR] Exercise seeding failed: {exc}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to seed exercises: {exc}",
+        )
+
+    from sqlalchemy import select, func
+    total_after = db.execute(
+        select(func.count(Exercise.id)).where(Exercise.trainer_id == current_trainer.id)
+    ).scalar_one()
+    return SeedDefaultsResponse(created=created, skipped=skipped, total_after=total_after)
 
 
 def _get_exercise_or_404(

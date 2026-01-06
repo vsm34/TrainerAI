@@ -3,25 +3,80 @@
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
 import { useForm } from "react-hook-form";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { parseISO, format } from "date-fns";
+import { WorkoutPlanPreview } from "@/components/WorkoutPlanPreview";
+import { useAuth } from "@/context/AuthContext";
+
+type Exercise = {
+  id: string;
+  name: string;
+  equipment?: string | null;
+  movement_pattern?: string | null;
+};
+
+type WorkoutSet = {
+  id: string;
+  workout_block_id: string;
+  exercise_id: string;
+  set_index: number;
+  target_reps_min?: number | null;
+  target_reps_max?: number | null;
+  target_load_value?: number | null;
+  rest_seconds?: number | null;
+  notes?: string | null;
+  prescription_text?: string | null;
+};
+
+type WorkoutBlock = {
+  id: string;
+  workout_id: string;
+  block_type: string;
+  sequence_index: number;
+  notes?: string | null;
+  sets: WorkoutSet[];
+};
 
 type Workout = {
-  id: number;
+  id: string;
   title: string;
   date: string;
   status: string;
   notes?: string | null;
   freeform_log?: string | null;
+  blocks: WorkoutBlock[];
 };
 
 async function fetchWorkout(id: string): Promise<Workout> {
   const res = await api.get(`/api/v1/workouts/${id}`);
   return res.data;
+}
+
+async function fetchExercises(): Promise<Exercise[]> {
+  try {
+    const res = await api.get("/api/v1/exercises/");
+    const data = res.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object" && Array.isArray(data.items)) {
+      return data.items;
+    }
+    return [];
+  } catch (error: any) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      throw error;
+    }
+    return [];
+  }
+}
+
+async function deleteWorkout(id: string): Promise<void> {
+  await api.delete(`/api/v1/workouts/${id}`);
 }
 
 type WorkoutUpdate = {
@@ -40,13 +95,32 @@ const formatWorkoutDate = (value?: string | null) => {
 
 export default function WorkoutDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const { user, loading: authLoading } = useAuth();
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["workout", id],
     queryFn: () => fetchWorkout(id),
-    enabled: !!id,
+    enabled: !!id && !authLoading && !!user,
   });
+
+  const { data: exercises } = useQuery({
+    queryKey: ["exercises"],
+    queryFn: fetchExercises,
+    enabled: !authLoading && !!user,
+  });
+
+  // Build lookup map from exercise_id -> exercise object
+  const exerciseMap = useMemo(() => {
+    if (!exercises) return new Map<string, Exercise>();
+    const map = new Map<string, Exercise>();
+    exercises.forEach((ex) => {
+      map.set(ex.id, ex);
+    });
+    return map;
+  }, [exercises]);
 
   const { register, handleSubmit, reset } = useForm<WorkoutUpdate>();
 
@@ -74,8 +148,46 @@ export default function WorkoutDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workout", id] });
       queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      router.push("/workouts");
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteWorkout(id!),
+    onSuccess: () => {
+      // Invalidate queries first
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["workout", id] });
+      // Remove the workout from cache to prevent navigation to it
+      queryClient.removeQueries({ queryKey: ["workout", id] });
+      // Navigate away immediately
+      router.push("/workouts");
+    },
+    onError: (error: any) => {
+      // Log detailed error information
+      console.error("Delete workout error:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        stack: error.stack,
+      });
+      
+      const errorMsg =
+        error.response?.data?.detail || 
+        error.response?.data?.message ||
+        error.message || 
+        `Failed to delete workout. Status: ${error.response?.status || "unknown"}`;
+      setMessage({ type: "error", text: errorMsg });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const handleDelete = () => {
+    if (data && confirm(`Delete "${data.title}"? This cannot be undone.`)) {
+      deleteMutation.mutate();
+    }
+  };
 
   const onSubmit = (values: WorkoutUpdate) => {
     const payload: any = {
@@ -97,15 +209,51 @@ export default function WorkoutDetailPage() {
       <AppShell>
         {isLoading || !data ? (
           <p className="text-sm text-slate-400">Loading workout...</p>
+        ) : error ? (
+          <div className="rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
+            {error.response?.status === 404
+              ? "Workout not found."
+              : error.message || "Failed to load workout. Please try again."}
+          </div>
         ) : (
           <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-semibold">{data.title}</h2>
-              <p className="text-sm text-slate-400">
-                {formatWorkoutDate(data.date)} ·{" "}
-                {data.status ?? "planned"}
-              </p>
+            {message && (
+              <div
+                className={`rounded border px-4 py-3 text-sm ${
+                  message.type === "success"
+                    ? "border-green-800 bg-green-950 text-green-200"
+                    : "border-red-800 bg-red-950 text-red-200"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
+
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">{data.title}</h2>
+                <p className="text-sm text-slate-400">
+                  {formatWorkoutDate(data.date)} ·{" "}
+                  {data.status ?? "planned"}
+                </p>
+              </div>
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="rounded bg-red-600 px-4 py-2 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </button>
             </div>
+
+            {data.blocks && data.blocks.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium text-slate-200">
+                  Workout Plan
+                </h3>
+                <WorkoutPlanPreview blocks={data.blocks} exerciseMap={exerciseMap} />
+              </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-sm">
               <div>
@@ -158,9 +306,10 @@ export default function WorkoutDetailPage() {
 
               <button
                 type="submit"
-                className="rounded bg-blue-600 px-4 py-2 text-xs font-medium hover:bg-blue-500"
+                disabled={mutation.isPending}
+                className="rounded bg-blue-600 px-4 py-2 text-xs font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save changes
+                {mutation.isPending ? "Saving..." : "Save changes"}
               </button>
             </form>
           </div>

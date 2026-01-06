@@ -8,11 +8,28 @@ from app.db.base import Base  # <-- make sure this import exists
 
 
 # Create the engine from DATABASE_URL in config.py
+# For SQLite, enable foreign key constraints
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
 engine = create_engine(
     settings.DATABASE_URL,
     echo=False,
     future=True,
+    connect_args=connect_args,
 )
+
+# Enable foreign keys for SQLite
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # 🚨 DEV-ONLY: auto-create tables if they don't exist
 # This is fine for local SQLite while you're building things.

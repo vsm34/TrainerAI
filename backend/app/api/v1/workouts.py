@@ -472,9 +472,59 @@ async def delete_workout(
 ) -> None:
     """
     Delete a workout owned by the current trainer.
-    Cascades to blocks and sets automatically via foreign key constraints.
+    Cascades to blocks, sets, and completed_sets automatically via foreign key constraints.
     """
-    workout = _get_workout_or_404(workout_id, db, current_trainer.id)
-    db.delete(workout)
-    db.commit()
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.orm import selectinload
+
+    # Load workout with all relationships to ensure cascade works
+    result = db.execute(
+        select(Workout)
+        .where(
+            Workout.id == workout_id,
+            Workout.trainer_id == current_trainer.id,
+        )
+        .options(
+            selectinload(Workout.blocks).selectinload(WorkoutBlock.sets).selectinload(WorkoutSet.completed_sets)
+        )
+    )
+    workout = result.scalar_one_or_none()
+    
+    if workout is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout not found",
+        )
+    
+    try:
+        # Explicitly delete children first as a fallback if cascade doesn't work
+        # This ensures deletion works even if foreign keys aren't properly configured
+        if workout.blocks:
+            for block in workout.blocks:
+                if block.sets:
+                    for workout_set in block.sets:
+                        # Delete completed sets if they exist
+                        if workout_set.completed_sets:
+                            for completed_set in workout_set.completed_sets:
+                                db.delete(completed_set)
+                        db.delete(workout_set)
+                    db.flush()
+                db.delete(block)
+            db.flush()
+        
+        # Delete the workout
+        db.delete(workout)
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Failed to delete workout due to database constraints: {str(e)}",
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete workout: {str(e)}",
+        )
 

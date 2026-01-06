@@ -2,16 +2,35 @@
 import axios from "axios";
 import { auth } from "./firebase";
 
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Normalize baseURL to remove trailing slash to avoid double-slash issues
+const normalizedBaseURL = baseURL.replace(/\/+$/, "");
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000",
+  baseURL: normalizedBaseURL,
 });
 
 api.interceptors.request.use(async (config) => {
+  // Ensure headers object exists
+  config.headers = config.headers || {};
+
+  // Get Firebase auth token for all requests when user is logged in
   const user = auth.currentUser;
   if (user) {
-    const token = await user.getIdToken();
-    config.headers = config.headers ?? {};
-    config.headers["Authorization"] = `Bearer ${token}`;
+    try {
+      const token = await user.getIdToken();
+      if (token) {
+        config.headers["Authorization"] = `Bearer ${token}`;
+      } else {
+        console.error("API request attempted but auth token is null. User:", user.uid, "URL:", config.url);
+      }
+    } catch (error) {
+      console.error("Failed to get auth token for API request:", error, "URL:", config.url);
+      // Log error but don't throw - let the backend return 403
+    }
+  } else {
+    // Log warning if request is made without user (shouldn't happen if queries are gated properly)
+    console.warn("API request attempted without authenticated user:", config.url);
   }
   return config;
 });

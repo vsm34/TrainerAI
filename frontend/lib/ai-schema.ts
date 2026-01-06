@@ -55,3 +55,6 @@ export interface AIWorkoutPlan {
   blocks: WorkoutBlock[];
 }
 
+
+
+

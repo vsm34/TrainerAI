@@ -25,28 +25,42 @@ class Workout(Base):
     trainer: Mapped["Trainer"] = relationship("Trainer", back_populates="workouts")
     client: Mapped["Client | None"] = relationship("Client", back_populates="workouts")
     template: Mapped["Template | None"] = relationship("Template", back_populates="workouts")
-    blocks: Mapped[list["WorkoutBlock"]] = relationship("WorkoutBlock", back_populates="workout")
+    blocks: Mapped[list["WorkoutBlock"]] = relationship(
+        "WorkoutBlock",
+        back_populates="workout",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class WorkoutBlock(Base):
     __tablename__ = "workout_block"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    workout_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout.id"), nullable=False)
+    workout_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workout.id", ondelete="CASCADE"), nullable=False
+    )
     block_type: Mapped[str] = mapped_column(String)
     sequence_index: Mapped[int] = mapped_column(Integer)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     workout: Mapped["Workout"] = relationship("Workout", back_populates="blocks")
-    sets: Mapped[list["WorkoutSet"]] = relationship("WorkoutSet", back_populates="block")
+    sets: Mapped[list["WorkoutSet"]] = relationship(
+        "WorkoutSet",
+        back_populates="block",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class WorkoutSet(Base):
     __tablename__ = "workout_set"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    workout_block_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout_block.id"), nullable=False)
+    workout_block_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workout_block.id", ondelete="CASCADE"), nullable=False
+    )
     exercise_id: Mapped[str] = mapped_column(String(36), ForeignKey("exercise.id"), nullable=False)
     set_index: Mapped[int] = mapped_column(Integer)
     target_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -64,14 +78,21 @@ class WorkoutSet(Base):
     # Relationships
     block: Mapped["WorkoutBlock"] = relationship("WorkoutBlock", back_populates="sets")
     exercise: Mapped["Exercise"] = relationship("Exercise", back_populates="workout_sets")
-    completed_sets: Mapped[list["CompletedSet"]] = relationship("CompletedSet", back_populates="workout_set")
+    completed_sets: Mapped[list["CompletedSet"]] = relationship(
+        "CompletedSet",
+        back_populates="workout_set",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class CompletedSet(Base):
     __tablename__ = "completed_set"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    workout_set_id: Mapped[str] = mapped_column(String(36), ForeignKey("workout_set.id"), nullable=False)
+    workout_set_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workout_set.id", ondelete="CASCADE"), nullable=False
+    )
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actual_load: Mapped[float | None] = mapped_column(Numeric, nullable=True)
     actual_rpe: Mapped[float | None] = mapped_column(Numeric, nullable=True)

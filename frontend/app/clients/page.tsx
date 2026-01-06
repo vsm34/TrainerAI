@@ -22,7 +22,7 @@ type ClientCreate = {
 };
 
 async function fetchClients(): Promise<Client[]> {
-  const res = await api.get("/api/v1/clients");
+  const res = await api.get("/api/v1/clients/");
   return res.data;
 }
 
@@ -36,7 +36,7 @@ export default function ClientsPage() {
   const { register, handleSubmit, reset } = useForm<ClientCreate>();
 
   const createMutation = useMutation({
-    mutationFn: (payload: ClientCreate) => api.post("/api/v1/clients", payload),
+    mutationFn: (payload: ClientCreate) => api.post("/api/v1/clients/", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       reset();

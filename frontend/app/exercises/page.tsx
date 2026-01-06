@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
 
 type Exercise = {
   id: number;
@@ -17,23 +18,35 @@ type Exercise = {
   trainer_id?: number | null;
 };
 
-type ExerciseList = {
-  items: Exercise[];
-};
-
-async function fetchExercises(): Promise<ExerciseList | Exercise[]> {
-  const res = await api.get("/api/v1/exercises");
-  return res.data;
+async function fetchExercises(): Promise<Exercise[]> {
+  try {
+    const res = await api.get("/api/v1/exercises/");
+    const data = res.data;
+    // Defensively handle both { items: [...] } and array formats
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object" && Array.isArray(data.items)) {
+      return data.items;
+    }
+    return [];
+  } catch (error: any) {
+    // Don't swallow 401/403 - let react-query handle it so we can show error
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      throw error;
+    }
+    // For other errors, return empty array
+    return [];
+  }
 }
 
 export default function ExercisesPage() {
-  const { data, isLoading } = useQuery({
+  const { user, loading: authLoading } = useAuth();
+  const { data: exercises, isLoading, error } = useQuery({
     queryKey: ["exercises"],
     queryFn: fetchExercises,
+    enabled: !authLoading && !!user,
   });
-
-  // Normalize the data to handle both array and object formats
-  const exercises = Array.isArray(data) ? data : data?.items ?? [];
 
   return (
     <ProtectedRoute>
@@ -45,7 +58,13 @@ export default function ExercisesPage() {
 
         {isLoading ? (
           <p className="text-sm text-slate-400">Loading exercises...</p>
-        ) : exercises.length === 0 ? (
+        ) : error ? (
+          <div className="rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
+            {error.response?.status === 401 || error.response?.status === 403
+              ? "Authentication failed. Please log in again."
+              : error.message || "Failed to load exercises. Please try again."}
+          </div>
+        ) : !exercises || exercises.length === 0 ? (
           <p className="text-sm text-slate-400">No exercises found.</p>
         ) : (
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">

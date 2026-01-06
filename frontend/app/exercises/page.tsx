@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
 
 type Exercise = {
   id: number;
@@ -42,6 +43,8 @@ async function fetchExercises(): Promise<Exercise[]> {
 
 export default function ExercisesPage() {
   const { user, loading: authLoading } = useAuth();
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all"|"mine"|"global">("all");
   const { data: exercises, isLoading, error } = useQuery({
     queryKey: ["exercises"],
     queryFn: fetchExercises,
@@ -51,10 +54,26 @@ export default function ExercisesPage() {
   return (
     <ProtectedRoute>
       <AppShell>
-        <h2 className="mb-2 text-2xl font-semibold">Exercises</h2>
-        <p className="mb-4 text-sm text-slate-300">
-          Global and trainer-specific exercises available for building workouts.
-        </p>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold">Exercises</h2>
+            <p className="text-sm text-slate-300">Global and trainer-specific exercises available for building workouts.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search name..." className="rounded bg-slate-800 px-2 py-1 text-sm text-white" />
+            <select value={filter} onChange={(e)=>setFilter(e.target.value as any)} className="rounded bg-slate-800 px-2 py-1 text-sm text-white">
+              <option value="all">All</option>
+              <option value="mine">Mine</option>
+              <option value="global">Global</option>
+            </select>
+            <a
+              href="/exercises/new"
+              className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white"
+            >
+              New
+            </a>
+          </div>
+        </div>
 
         {isLoading ? (
           <p className="text-sm text-slate-400">Loading exercises...</p>
@@ -68,38 +87,86 @@ export default function ExercisesPage() {
           <p className="text-sm text-slate-400">No exercises found.</p>
         ) : (
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {exercises.map((ex) => (
-              <div
-                key={ex.id}
-                className="rounded border border-slate-800 bg-slate-900 px-4 py-3 text-sm"
-              >
-                <div className="flex justify-between">
-                  <p className="font-medium">{ex.name}</p>
-                  {ex.trainer_id == null ? (
-                    <span className="rounded-full bg-emerald-600/20 px-2 py-0.5 text-[10px] text-emerald-300">
-                      Global
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-[10px] text-blue-300">
-                      Mine
-                    </span>
-                  )}
+              {exercises
+                .filter((ex) => {
+                  if (search && !ex.name.toLowerCase().includes(search.toLowerCase())) return false;
+                  if (filter === "mine") return ex.trainer_id != null;
+                  if (filter === "global") return ex.trainer_id == null;
+                  return true;
+                })
+                .map((ex) => (
+                <div
+                  key={ex.id}
+                  className="rounded border border-slate-800 bg-slate-900 px-4 py-3 text-sm"
+                >
+                  <div className="flex items-start justify-between">
+                    <div style={{minWidth:0}}>
+                      <p className="font-medium truncate">{ex.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {ex.movement_pattern ?? "—"}
+                        {ex.equipment ? ` · ${ex.equipment}` : ""}
+                        {ex.unilateral ? " · Unilateral" : ""}
+                        {ex.skill_level ? ` · ${ex.skill_level}` : ""}
+                      </p>
+                      {ex.notes && (
+                        <p className="mt-1 text-xs text-slate-500">{ex.notes}</p>
+                      )}
+                    </div>
+
+                    <div className="ml-3 flex shrink-0 items-center gap-2">
+                      {ex.trainer_id == null ? (
+                        <span className="rounded-full bg-emerald-600/20 px-2 py-0.5 text-[10px] text-emerald-300">
+                          Global
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-[10px] text-blue-300">
+                          Mine
+                        </span>
+                      )}
+
+                      {/* Edit only for trainer-owned exercises */}
+                      {ex.trainer_id != null && (
+                        <a
+                          href={`/exercises/${ex.id}`}
+                          className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-200"
+                        >
+                          Edit
+                        </a>
+                      )}
+
+                      {ex.trainer_id != null && (
+                        <DeleteExerciseButton id={ex.id} />
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  {ex.movement_pattern ?? "—"}
-                  {ex.equipment ? ` · ${ex.equipment}` : ""}
-                  {ex.unilateral ? " · Unilateral" : ""}
-                  {ex.skill_level ? ` · ${ex.skill_level}` : ""}
-                </p>
-                {ex.notes && (
-                  <p className="mt-1 text-xs text-slate-500">{ex.notes}</p>
-                )}
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </AppShell>
     </ProtectedRoute>
   );
 }
+
+  function DeleteExerciseButton({ id }: { id: string }) {
+    const handleDelete = async () => {
+      if (!confirm("Delete this exercise? This cannot be undone.")) return;
+      try {
+        await api.delete(`/api/v1/exercises/${id}`);
+        // Simple refresh - navigate to same page to refetch on mount
+        window.location.href = "/exercises";
+      } catch (err: any) {
+        alert(err?.response?.data?.detail || "Failed to delete exercise");
+      }
+    };
+
+    return (
+      <button
+        onClick={handleDelete}
+        className="rounded bg-red-700 px-2 py-1 text-xs text-white"
+      >
+        Delete
+      </button>
+    );
+  }
 

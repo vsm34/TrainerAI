@@ -14,6 +14,8 @@ from app.schemas.exercise import (
     SeedDefaultsResponse,
 )
 from app.services.exercise_seed import seed_default_exercises_for_trainer
+from app.models.muscle import Muscle
+from app.taxonomy.base import MovementPattern
 
 
 router = APIRouter()
@@ -53,6 +55,26 @@ async def list_exercises(
     return ExerciseList(items=list(exercises))
 
 
+
+@router.get("/metadata")
+async def exercises_metadata(
+    db: DBSessionDep,
+    current_trainer: TrainerDep,
+) -> dict:
+    """
+    Return muscles (id + name) and allowed movement patterns for client-side forms.
+    """
+    result = db.execute(select(Muscle).order_by(Muscle.name))
+    muscles = [{"id": m.id, "name": m.name} for m in result.scalars().all()]
+
+    movement_patterns = [
+        {"key": mp.value, "label": mp.name.replace("_", " ").title()}
+        for mp in MovementPattern
+    ]
+
+    return {"muscles": muscles, "movement_patterns": movement_patterns}
+
+
 @router.get("/{exercise_id}", response_model=ExerciseRead)
 async def get_exercise(
     exercise_id: str,
@@ -75,9 +97,11 @@ async def create_exercise(
     Create a new exercise for the current trainer.
     """
     exercise = Exercise(
-        trainer_id=current_trainer.id,
-        **payload.model_dump(),
-    )
+    trainer_id=current_trainer.id,
+    **payload.model_dump(exclude={"secondary_muscle_ids"}),
+)
+
+    
     db.add(exercise)
     db.commit()
     db.refresh(exercise)
@@ -145,6 +169,25 @@ def seed_default_exercises(
         select(func.count(Exercise.id)).where(Exercise.trainer_id == current_trainer.id)
     ).scalar_one()
     return SeedDefaultsResponse(created=created, skipped=skipped, total_after=total_after)
+
+
+@router.get("/metadata")
+async def exercises_metadata(
+    db: DBSessionDep,
+    current_trainer: TrainerDep,
+) -> dict:
+    """
+    Return muscles (id + name) and allowed movement patterns for client-side forms.
+    """
+    result = db.execute(select(Muscle).order_by(Muscle.name))
+    muscles = [{"id": m.id, "name": m.name} for m in result.scalars().all()]
+
+    movement_patterns = [
+        {"key": mp.value, "label": mp.name.replace("_", " ").title()}
+        for mp in MovementPattern
+    ]
+
+    return {"muscles": muscles, "movement_patterns": movement_patterns}
 
 
 def _get_exercise_or_404(

@@ -9,9 +9,12 @@ All models are JSON-serializable and designed to accept AI-generated workout pla
 that can later be converted into the standard Workout models.
 """
 
-from typing import Literal, Optional
+from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+import re
+from typing import Literal, Optional, Any
+
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 # Enum-like types matching taxonomy_reference.md
@@ -19,17 +22,75 @@ SubsetType = Literal["upper", "lower", "core", "full_body", "conditioning"]
 BlockType = Literal["straight", "superset", "circuit"]
 
 
-class SetPrescription(BaseModel):
+def _extract_first_int(value: Any) -> Optional[int]:
     """
-    Represents a single set prescription within a workout exercise.
-    Used by the AI to specify reps, weight, and optional notes for each set.
-    """
+    Best-effort extraction of an integer from messy LLM outputs.
 
-    reps: int
+    Examples:
+      - 12 -> 12
+      - "12" -> 12
+      - "12 reps" -> 12
+      - "45 seconds" -> 45
+      - "30s" -> 30
+      - None -> None
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        # If AI outputs 12.0 etc.
+        return int(value)
+
+    if isinstance(value, str):
+        s = value.strip().lower()
+        # Find first integer anywhere
+        m = re.search(r"(\d+)", s)
+        if m:
+            return int(m.group(1))
+
+    return None
+
+
+class SetPrescription(BaseModel):
+    reps: Optional[int] = None
+    seconds: Optional[int] = None
     weight: Optional[int] = None
     notes: Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_set(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        reps_val = _extract_first_int(data.get("reps"))
+        seconds_val = _extract_first_int(data.get("seconds"))
+
+        # If reps missing, try infer from notes IF it's clearly timed
+        if reps_val is None and seconds_val is None:
+            notes = (data.get("notes") or "").lower()
+            inferred = _extract_first_int(notes)
+            if inferred is not None:
+                if "sec" in notes or "second" in notes:
+                    seconds_val = inferred
+                else:
+                    reps_val = inferred
+
+        data["reps"] = reps_val
+        data["seconds"] = seconds_val
+        return data
+
+    @model_validator(mode="after")
+    def validate_reps_or_seconds(self):
+        if self.reps is None and self.seconds is None:
+            raise ValueError(
+                "Invalid set prescription: missing reps/seconds. "
+                "Each set must include either reps (int) or seconds (int)."
+            )
+        return self
 
 
 class BlockExercise(BaseModel):

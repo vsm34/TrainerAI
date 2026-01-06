@@ -66,22 +66,41 @@ export function aiPlanToWorkoutCreate(
     for (const exercise of block.exercises) {
       // For each set in the exercise
       for (const set of exercise.sets) {
-        // Generate prescription_text
-        let prescriptionText: string;
-        if (set.weight !== null && set.weight !== undefined) {
-          prescriptionText = `${set.reps} reps @ ${set.weight}`;
-        } else {
-          prescriptionText = `${set.reps} reps`;
+        // Determine prescription text and numeric targets safely
+        let prescriptionText: string | null = null;
+        let targetRepsMin: number | null = null;
+        let targetRepsMax: number | null = null;
+
+        if (typeof set.reps === "number") {
+          targetRepsMin = set.reps;
+          targetRepsMax = set.reps;
+          if (set.weight !== null && set.weight !== undefined) {
+            prescriptionText = `${set.reps} reps @ ${set.weight}`;
+          } else {
+            prescriptionText = `${set.reps} reps`;
+          }
+        } else if (typeof set.seconds === "number") {
+          // Timed set
+          prescriptionText = `${set.seconds} seconds`;
+          if (set.notes) prescriptionText += ` ${set.notes}`;
+        } else if (set.reps_text) {
+          prescriptionText = set.reps_text;
+          if (set.weight !== null && set.weight !== undefined) {
+            prescriptionText += ` @ ${set.weight}`;
+          }
+        } else if ((set as any).prescription_text) {
+          // Fallback to any existing prescription_text field
+          prescriptionText = (set as any).prescription_text;
         }
 
         sets.push({
           exercise_id: exercise.exercise_id,
           set_index: setIndex,
           target_sets: null,
-          target_reps_min: set.reps,
-          target_reps_max: set.reps,
+          target_reps_min: targetRepsMin,
+          target_reps_max: targetRepsMax,
           target_load_type: null,
-          target_load_value: set.weight ?? null,
+          target_load_value: (set as any).weight ?? null,
           rpe_target: null,
           rest_seconds: block.rest_seconds,
           tempo: null,

@@ -57,6 +57,7 @@ class SetPrescription(BaseModel):
     seconds: Optional[int] = None
     weight: Optional[int] = None
     notes: Optional[str] = None
+    reps_text: Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -71,13 +72,29 @@ class SetPrescription(BaseModel):
 
         # If reps missing, try infer from notes IF it's clearly timed
         if reps_val is None and seconds_val is None:
-            notes = (data.get("notes") or "").lower()
+            # First, try to infer numeric value from notes
+            notes = (data.get("notes") or "")
             inferred = _extract_first_int(notes)
             if inferred is not None:
-                if "sec" in notes or "second" in notes:
+                notes_l = notes.lower()
+                if "sec" in notes_l or "second" in notes_l:
                     seconds_val = inferred
                 else:
                     reps_val = inferred
+
+            # If still missing numeric reps/seconds, preserve textual prescription
+            # from the original `reps` field (e.g., "AMRAP", "to failure") or
+            # from `notes` when it contains clear prescription language.
+            if reps_val is None and seconds_val is None:
+                orig_reps = data.get("reps")
+                if isinstance(orig_reps, str) and orig_reps.strip():
+                    data["reps_text"] = orig_reps.strip()
+                else:
+                    notes_l = notes.lower()
+                    # Heuristic keywords indicating a textual prescription
+                    keywords = ["amrap", "to failure", "failure", "as many", "until", "max"]
+                    if any(k in notes_l for k in keywords) or inferred is not None:
+                        data["reps_text"] = notes.strip() if notes.strip() else None
 
         data["reps"] = reps_val
         data["seconds"] = seconds_val
@@ -85,10 +102,11 @@ class SetPrescription(BaseModel):
 
     @model_validator(mode="after")
     def validate_reps_or_seconds(self):
-        if self.reps is None and self.seconds is None:
+        # Accept sets that have numeric reps/seconds or a textual prescription
+        if self.reps is None and self.seconds is None and (not self.reps_text):
             raise ValueError(
-                "Invalid set prescription: missing reps/seconds. "
-                "Each set must include either reps (int) or seconds (int)."
+                "Invalid set prescription: missing reps/seconds or textual prescription. "
+                "Each set must include either reps (int), seconds (int), or a textual reps_text."
             )
         return self
 

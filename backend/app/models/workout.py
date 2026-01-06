@@ -2,6 +2,13 @@ from sqlalchemy import String, Text, Integer, ForeignKey, Numeric, Boolean, Date
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
 from uuid import uuid4
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .trainer import Trainer
+    from .client import Client
+    from .template import Template
+    from .exercise import Exercise
 
 from app.db.base import Base
 

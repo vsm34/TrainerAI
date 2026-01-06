@@ -18,6 +18,8 @@ type WorkoutBlock = {
     set_index: number;
     target_reps_min?: number | null;
     target_reps_max?: number | null;
+      seconds?: number | null;
+      reps_text?: string | null;
     target_load_value?: number | null;
     rest_seconds?: number | null;
     notes?: string | null;
@@ -101,6 +103,10 @@ export function WorkoutPlanPreview({ blocks, exerciseMap }: WorkoutPlanPreviewPr
                           set.target_reps_min === set.target_reps_max
                             ? `${set.target_reps_min} reps`
                             : `${set.target_reps_min}-${set.target_reps_max} reps`;
+                      } else if (set.seconds !== null && set.seconds !== undefined) {
+                        repsText = `${set.seconds} seconds`;
+                      } else if (set.reps_text) {
+                        repsText = set.reps_text;
                       } else if (set.prescription_text) {
                         repsText = set.prescription_text;
                       } else {

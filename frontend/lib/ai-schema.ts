@@ -18,9 +18,11 @@ export type BlockType = "straight" | "superset" | "circuit";
  * Used by the AI to specify reps, weight, and optional notes for each set.
  */
 export interface SetPrescription {
-  reps: number;
-  weight: number | null;
-  notes: string | null;
+  reps?: number | null;
+  seconds?: number | null;
+  reps_text?: string | null;
+  weight?: number | null;
+  notes?: string | null;
 }
 
 /**

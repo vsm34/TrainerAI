@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Client = {
   id: string;
@@ -73,14 +74,6 @@ export default function NewWorkoutPage() {
         router.push(`/workouts/${data.id}`);
       }, 500);
     },
-    onError: (error: any) => {
-      console.error("Failed to create workout:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-      });
-    },
   });
 
   const onSubmit = (values: WorkoutCreate) => {
@@ -110,10 +103,7 @@ export default function NewWorkoutPage() {
 
         {createMutation.isError && (
           <div className="mb-4 rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
-            {createMutation.error?.response?.data?.detail ||
-              createMutation.error?.response?.data?.message ||
-              createMutation.error?.message ||
-              "Failed to create workout. Please try again."}
+            {getApiErrorMessage(createMutation.error)}
           </div>
         )}
 

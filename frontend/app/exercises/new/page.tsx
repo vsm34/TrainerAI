@@ -73,8 +73,7 @@ export default function NewExercisePage() {
         }
       } catch (err: any) {
         // surface error and allow manual fallback inputs
-        const detail = err?.response?.data?.detail || err?.message || String(err);
-        setMetadataError(String(detail));
+        setMetadataError(getApiErrorMessage(err));
       } finally {
         if (mounted) setMetaLoading(false);
       }

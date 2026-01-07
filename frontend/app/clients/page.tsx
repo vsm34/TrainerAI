@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Client = {
   id: string;
@@ -60,9 +61,7 @@ export default function ClientsPage() {
           <p className="text-sm text-slate-400">Loading clients...</p>
         ) : error ? (
           <div className="rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
-            {error.response?.status === 401 || error.response?.status === 403
-              ? "Authentication failed. Please log in again."
-              : error.message || "Failed to load clients. Please try again."}
+            {getApiErrorMessage(error)}
           </div>
         ) : !clients || clients.length === 0 ? (
           <p className="text-sm text-slate-400">No clients found.</p>

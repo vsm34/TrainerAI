@@ -55,8 +55,9 @@ async function fetchExercises(): Promise<Exercise[]> {
     return [];
   } catch (error: any) {
     // Don't swallow 401/403 - let react-query handle it
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      throw error;
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
     }
     // For other errors, return empty array
     return [];
@@ -168,9 +169,7 @@ export default function GenerateWorkoutPage() {
 
         {exercisesError && (
           <div className="mb-4 rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
-            {exercisesError.response?.status === 401 || exercisesError.response?.status === 403
-              ? "Authentication failed. Please log in again."
-              : exercisesError.message || "Failed to load exercises. Please try again."}
+            {getApiErrorMessage(exercisesError)}
           </div>
         )}
         {!exercisesLoading && !exercisesError && (!exercises || exercises.length === 0) && (

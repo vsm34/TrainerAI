@@ -37,7 +37,11 @@ async function fetchWorkouts(): Promise<MinimalWorkout[]> {
     if (data && typeof data === "object" && Array.isArray(data.items)) return data.items as MinimalWorkout[];
     return [];
   } catch (error: any) {
-    if (error.response?.status === 401 || error.response?.status === 403) throw error;
+    // Re-throw auth errors to trigger react-query error state
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
+    }
     return [];
   }
 }
@@ -50,7 +54,11 @@ async function fetchExercises(): Promise<Exercise[]> {
     if (data && typeof data === "object" && Array.isArray(data.items)) return data.items as Exercise[];
     return [];
   } catch (error: any) {
-    if (error.response?.status === 401 || error.response?.status === 403) throw error;
+    // Re-throw auth errors to trigger react-query error state
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
+    }
     return [];
   }
 }
@@ -63,7 +71,11 @@ async function fetchClients(): Promise<Client[]> {
     if (data && typeof data === "object" && Array.isArray(data.items)) return data.items as Client[];
     return [];
   } catch (error: any) {
-    if (error.response?.status === 401 || error.response?.status === 403) throw error;
+    // Re-throw auth errors to trigger react-query error state
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
+    }
     return [];
   }
 }

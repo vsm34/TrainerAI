@@ -9,6 +9,7 @@ import Link from "next/link";
 import { parseISO, format } from "date-fns";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Workout = {
   id: string;
@@ -53,21 +54,7 @@ export default function WorkoutsPage() {
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
-      // Log detailed error information
-      console.error("Delete workout error:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        stack: error.stack,
-      });
-      
-      const errorMsg =
-        error.response?.data?.detail || 
-        error.response?.data?.message ||
-        error.message || 
-        `Failed to delete workout. Status: ${error.response?.status || "unknown"}`;
-      setMessage({ type: "error", text: errorMsg });
+      setMessage({ type: "error", text: getApiErrorMessage(error) });
       setTimeout(() => setMessage(null), 5000);
     },
   });

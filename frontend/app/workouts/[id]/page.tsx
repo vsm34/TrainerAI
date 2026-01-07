@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { parseISO, format } from "date-fns";
 import { WorkoutPlanPreview } from "@/components/WorkoutPlanPreview";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import {
   WorkoutRead,
   WorkoutUpdate as WorkoutUpdatePayload,
@@ -52,8 +53,10 @@ async function fetchExercises(): Promise<Exercise[]> {
     }
     return [];
   } catch (error: any) {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      throw error;
+    // Re-throw auth errors to trigger react-query error state
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
     }
     return [];
   }
@@ -155,12 +158,7 @@ export default function WorkoutDetailPage() {
       setTimeout(() => setMessage(null), 5000);
     },
     onError: (error: any) => {
-      const errorMsg =
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update workout plan.";
-      setMessage({ type: "error", text: errorMsg });
+      setMessage({ type: "error", text: getApiErrorMessage(error) });
       // Stay in edit mode on error so user can retry
     },
   });
@@ -177,21 +175,7 @@ export default function WorkoutDetailPage() {
       router.push("/workouts");
     },
     onError: (error: any) => {
-      // Log detailed error information
-      console.error("Delete workout error:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        stack: error.stack,
-      });
-      
-      const errorMsg =
-        error.response?.data?.detail || 
-        error.response?.data?.message ||
-        error.message || 
-        `Failed to delete workout. Status: ${error.response?.status || "unknown"}`;
-      setMessage({ type: "error", text: errorMsg });
+      setMessage({ type: "error", text: getApiErrorMessage(error) });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -363,9 +347,7 @@ export default function WorkoutDetailPage() {
           <p className="text-sm text-slate-400">Loading workout...</p>
         ) : error ? (
           <div className="rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
-            {error.response?.status === 404
-              ? "Workout not found."
-              : error.message || "Failed to load workout. Please try again."}
+            {getApiErrorMessage(error)}
           </div>
         ) : (
           <div className="space-y-4">

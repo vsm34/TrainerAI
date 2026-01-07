@@ -35,8 +35,9 @@ async function fetchExercises(): Promise<Exercise[]> {
     return [];
   } catch (error: any) {
     // Don't swallow 401/403 - let react-query handle it so we can show error
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      throw error;
+    if (error && typeof error === 'object' && 'response' in error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) throw error;
     }
     // For other errors, return empty array
     return [];
@@ -81,9 +82,7 @@ export default function ExercisesPage() {
           <p className="text-sm text-slate-400">Loading exercises...</p>
         ) : error ? (
           <div className="rounded border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
-            {error.response?.status === 401 || error.response?.status === 403
-              ? "Authentication failed. Please log in again."
-              : error.message || "Failed to load exercises. Please try again."}
+            {getApiErrorMessage(error)}
           </div>
         ) : !exercises || exercises.length === 0 ? (
           <p className="text-sm text-slate-400">No exercises found.</p>
@@ -129,7 +128,7 @@ export default function ExercisesPage() {
                       {/* Edit only for trainer-owned exercises */}
                       {ex.is_mine && (
                         <a
-                          href={`/exercises/${ex.id}`}
+                          href={`/exercises/${String(ex.id)}`}
                           className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-200"
                         >
                           Edit
@@ -137,7 +136,7 @@ export default function ExercisesPage() {
                       )}
 
                       {ex.is_mine && (
-                        <DeleteExerciseButton id={ex.id} />
+                        <DeleteExerciseButton id={String(ex.id)} />
                       )}
                     </div>
                   </div>

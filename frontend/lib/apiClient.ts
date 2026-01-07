@@ -21,16 +21,13 @@ api.interceptors.request.use(async (config) => {
       const token = await user.getIdToken();
       if (token) {
         config.headers["Authorization"] = `Bearer ${token}`;
-      } else {
-        console.error("API request attempted but auth token is null. User:", user.uid, "URL:", config.url);
       }
     } catch (error) {
-      console.error("Failed to get auth token for API request:", error, "URL:", config.url);
-      // Log error but don't throw - let the backend return 403
+      // Auth token retrieval failed - backend will return 403
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Failed to get auth token for API request:", config.url);
+      }
     }
-  } else {
-    // Log warning if request is made without user (shouldn't happen if queries are gated properly)
-    console.warn("API request attempted without authenticated user:", config.url);
   }
   return config;
 });

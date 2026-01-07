@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Client = {
   id: string;
@@ -86,7 +87,7 @@ export default function ClientDetailPage() {
       await api.put(`/api/v1/clients/${id}`, payload);
       router.push("/clients");
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to save client");
+      alert(getApiErrorMessage(err));
     }
   };
 
@@ -98,7 +99,7 @@ export default function ClientDetailPage() {
       await api.delete(`/api/v1/clients/${id}`);
       router.push("/clients");
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to delete client");
+      alert(getApiErrorMessage(err));
     }
   };
 

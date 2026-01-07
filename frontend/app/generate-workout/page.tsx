@@ -10,6 +10,7 @@ import { AIWorkoutPlan } from "@/lib/ai-schema";
 import { aiPlanToWorkoutCreate } from "@/lib/workoutTransform";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Client = {
   id: string;
@@ -103,26 +104,6 @@ export default function GenerateWorkoutPage() {
     return map;
   }, [exercises]);
 
-  const formatError = (err: any): string => {
-    if (err.response?.data) {
-      const data = err.response.data;
-      // Handle FastAPI validation errors (422)
-      if (Array.isArray(data.detail)) {
-        return data.detail
-          .map((d: any) => `${d.loc?.join(".") || "field"}: ${d.msg || d.message || "validation error"}`)
-          .join(", ");
-      }
-      // Handle standard error messages
-      if (data.detail) {
-        return typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
-      }
-      if (data.message) {
-        return data.message;
-      }
-    }
-    return err.message || "An unexpected error occurred. Please try again.";
-  };
-
   const generateMutation = useMutation({
     mutationFn: generateWorkout,
     onSuccess: (data) => {
@@ -130,7 +111,7 @@ export default function GenerateWorkoutPage() {
       setError(null);
     },
     onError: (err: any) => {
-      setError(formatError(err));
+      setError(getApiErrorMessage(err));
       setGeneratedPlan(null);
     },
   });
@@ -141,7 +122,7 @@ export default function GenerateWorkoutPage() {
       router.push(`/workouts/${data.id}`);
     },
     onError: (err: any) => {
-      setError(formatError(err));
+      setError(getApiErrorMessage(err));
     },
   });
 

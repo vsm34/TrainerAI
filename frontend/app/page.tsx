@@ -157,6 +157,11 @@ export default function DashboardPage() {
   const anyLoading = authLoading || wLoading || eLoading || cLoading;
   const anyError = wError || eError || cError;
 
+  // Check for new user empty state
+  const workoutsCount = (workouts || []).length;
+  const clientsCount = (clients || []).length;
+  const isNewUser = !anyLoading && workoutsCount === 0 && clientsCount === 0;
+
   return (
     <ProtectedRoute>
       <AppShell>
@@ -173,7 +178,58 @@ export default function DashboardPage() {
           </div>
         ) : null}
 
-        {/* Totals */}
+        {/* New User Welcome State */}
+        {isNewUser ? (
+          <div className="mx-auto max-w-2xl">
+            <div className="rounded-xl border border-slate-700 bg-gradient-to-br from-slate-900 to-slate-800 p-8 shadow-lg">
+              <h3 className="mb-4 text-2xl font-semibold text-slate-50">Welcome to TrainerAI</h3>
+              <p className="mb-6 text-sm text-slate-300">
+                Get started with AI-powered workout planning and client management.
+              </p>
+              
+              <ul className="mb-8 space-y-2 text-sm text-slate-300">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-400">✓</span>
+                  <span>Generate personalized workouts with AI</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-400">✓</span>
+                  <span>Track and manage your clients</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-400">✓</span>
+                  <span>Starter exercises are ready to use</span>
+                </li>
+              </ul>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <a
+                  href="/generate-workout"
+                  className="flex-1 rounded-lg bg-blue-600 px-6 py-3 text-center text-sm font-medium text-white hover:bg-blue-500"
+                >
+                  Create your first workout
+                </a>
+                <a
+                  href="/clients/new"
+                  className="flex-1 rounded-lg bg-slate-700 px-6 py-3 text-center text-sm font-medium text-white hover:bg-slate-600"
+                >
+                  Add your first client
+                </a>
+              </div>
+
+              <div className="mt-4 text-center">
+                <a
+                  href="/exercises"
+                  className="text-sm text-slate-400 hover:text-slate-300"
+                >
+                  Browse exercises →
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {!isNewUser && (
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded border border-slate-800 bg-slate-900 p-4">
             <p className="text-xs text-slate-400">Total Workouts</p>
@@ -188,13 +244,25 @@ export default function DashboardPage() {
             <p className="mt-1 text-2xl font-semibold">{(clients || []).length}</p>
           </div>
         </div>
+        )}
 
+        {!isNewUser && (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Recent Activity */}
           <div>
             <h3 className="mb-2 text-sm font-medium text-slate-200">Recent Workouts</h3>
             <div className="space-y-2">
-              {recent.length === 0 ? (
+              {workoutsCount === 0 ? (
+                <div className="rounded border border-slate-700 bg-slate-900 p-4 text-center">
+                  <p className="mb-2 text-sm text-slate-400">No workouts yet</p>
+                  <a
+                    href="/generate-workout"
+                    className="inline-block rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500"
+                  >
+                    Create your first workout
+                  </a>
+                </div>
+              ) : recent.length === 0 ? (
                 <p className="text-xs text-slate-400">No recent workouts.</p>
               ) : (
                 recent.map((w) => (
@@ -230,8 +298,10 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Analytics */}
+        {!isNewUser && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <div>
             <h3 className="mb-2 text-sm font-medium text-slate-200">Most Used Exercises</h3>
@@ -271,6 +341,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        )}
       </AppShell>
     </ProtectedRoute>
   );

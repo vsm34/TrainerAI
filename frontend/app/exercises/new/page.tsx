@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import api from "@/lib/apiClient";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 export default function NewExercisePage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function NewExercisePage() {
         router.push("/exercises");
       }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to create exercise");
+      alert(getApiErrorMessage(err));
       setSaving(false);
     }
   };

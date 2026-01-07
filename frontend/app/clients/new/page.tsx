@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function NewClientPage() {
         router.push("/clients");
       }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to create client");
+      alert(getApiErrorMessage(err));
       setSaving(false);
     }
   };

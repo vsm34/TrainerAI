@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import { useState } from "react";
 
 type Exercise = {
@@ -157,7 +158,7 @@ export default function ExercisesPage() {
         // Simple refresh - navigate to same page to refetch on mount
         window.location.href = "/exercises";
       } catch (err: any) {
-        alert(err?.response?.data?.detail || "Failed to delete exercise");
+        alert(getApiErrorMessage(err));
       }
     };
 

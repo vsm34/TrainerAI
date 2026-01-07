@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import api from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 type Exercise = {
   id: string;
@@ -77,7 +78,7 @@ export default function ExerciseDetailPage() {
       await api.put(`/api/v1/exercises/${id}`, payload);
       router.push("/exercises");
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to save");
+      alert(getApiErrorMessage(err));
     }
   };
 
@@ -89,7 +90,7 @@ export default function ExerciseDetailPage() {
       await api.delete(`/api/v1/exercises/${id}`);
       router.push("/exercises");
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to delete");
+      alert(getApiErrorMessage(err));
     }
   };
 

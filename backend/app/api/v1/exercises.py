@@ -123,8 +123,9 @@ async def update_exercise(
 ) -> ExerciseRead:
     """
     Update an existing exercise owned by the current trainer.
+    Cannot update global exercises.
     """
-    exercise = _get_exercise_or_404(exercise_id, db, current_trainer.id)
+    exercise = _get_trainer_exercise_or_404(exercise_id, db, current_trainer.id)
 
     for field, value in payload.model_dump(exclude_unset=True, exclude={"secondary_muscle_ids"}).items():
         setattr(exercise, field, value)
@@ -144,8 +145,9 @@ async def delete_exercise(
 ) -> None:
     """
     Delete an exercise owned by the current trainer.
+    Cannot delete global exercises.
     """
-    exercise = _get_exercise_or_404(exercise_id, db, current_trainer.id)
+    exercise = _get_trainer_exercise_or_404(exercise_id, db, current_trainer.id)
     db.delete(exercise)
     db.commit()
 
@@ -184,7 +186,7 @@ def _get_exercise_or_404(
     trainer_id: str,
 ) -> Exercise:
     """
-    Helper function to get an exercise by ID and trainer_id, or raise 404.
+    Helper function to get an exercise by ID (global or trainer-owned) for READ operations.
     """
     result = db.execute(
         select(Exercise).where(
@@ -197,6 +199,30 @@ def _get_exercise_or_404(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exercise not found",
+        )
+    return exercise
+
+
+def _get_trainer_exercise_or_404(
+    exercise_id: str,
+    db: Session,
+    trainer_id: str,
+) -> Exercise:
+    """
+    Helper function to get a trainer-owned exercise by ID for UPDATE/DELETE operations.
+    Raises 404 if not found or if exercise is global (trainer_id is NULL).
+    """
+    result = db.execute(
+        select(Exercise).where(
+            Exercise.id == exercise_id,
+            Exercise.trainer_id == trainer_id,
+        )
+    )
+    exercise = result.scalar_one_or_none()
+    if exercise is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found or not owned by trainer",
         )
     return exercise
 

@@ -9,7 +9,7 @@ class Exercise(Base):
     __tablename__ = "exercise"
 
     id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid4()))
-    trainer_id = Column(String(36), ForeignKey("trainer.id"), nullable=False, index=True)
+    trainer_id = Column(String(36), ForeignKey("trainer.id"), nullable=True, index=True)  # ✅ Nullable for global exercises
 
     name = Column(String, nullable=False)
     primary_muscle_id = Column(Integer, ForeignKey("muscle.id"), nullable=False)

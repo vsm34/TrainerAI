@@ -93,12 +93,12 @@ async def create_workout(
             for set_data in block.sets:
                 exercise_ids.add(set_data.exercise_id)
         
-        # Validate all exercise IDs belong to trainer
+        # Validate all exercise IDs exist (global or trainer-owned)
         if exercise_ids:
             result = db.execute(
                 select(Exercise).where(
                     Exercise.id.in_(exercise_ids),
-                    Exercise.trainer_id == current_trainer.id
+                    (Exercise.trainer_id == current_trainer.id) | (Exercise.trainer_id.is_(None))
                 )
             )
             valid_exercises = {ex.id for ex in result.scalars().all()}
@@ -107,7 +107,7 @@ async def create_workout(
             if invalid_exercises:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid exercise IDs (not found or not owned by trainer): {', '.join(invalid_exercises)}"
+                    detail=f"Invalid exercise IDs (not found): {', '.join(invalid_exercises)}"
                 )
         
         # Create blocks and sets
@@ -181,11 +181,11 @@ async def generate_workout(
                 detail="Client not found",
             )
 
-    # Fetch all active exercises for this trainer with relationships
+    # Fetch all active exercises for this trainer (including global) with relationships
     stmt = (
         select(Exercise)
         .where(
-            Exercise.trainer_id == current_trainer.id,
+            (Exercise.trainer_id == current_trainer.id) | (Exercise.trainer_id.is_(None)),
             Exercise.is_active == True,
         )
         .options(
@@ -492,12 +492,12 @@ async def update_workout(
                 for set_data in block.get("sets", []):
                     exercise_ids.add(set_data.get("exercise_id"))
             
-            # Validate all exercise IDs belong to trainer
+            # Validate all exercise IDs exist (global or trainer-owned)
             if exercise_ids:
                 result = db.execute(
                     select(Exercise).where(
                         Exercise.id.in_(exercise_ids),
-                        Exercise.trainer_id == current_trainer.id
+                        (Exercise.trainer_id == current_trainer.id) | (Exercise.trainer_id.is_(None))
                     )
                 )
                 valid_exercises = {ex.id for ex in result.scalars().all()}
@@ -506,7 +506,7 @@ async def update_workout(
                 if invalid_exercises:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid exercise IDs (not found or not owned by trainer): {', '.join(invalid_exercises)}"
+                        detail=f"Invalid exercise IDs (not found): {', '.join(invalid_exercises)}"
                     )
             
             # Create new blocks and sets

@@ -1,4 +1,4 @@
-# TrainerAI 🏋️‍♂️🤖
+# TrainerAI 🏋️‍♂️
 
 **TrainerAI** is a full-stack fitness training platform designed for personal trainers and serious lifters. It combines structured workout management, client tracking, analytics, and AI-assisted workout generation into a clean, production-ready web application.
 

@@ -31,27 +31,32 @@ async def list_exercises(
     equipment: str | None = Query(None, description="Filter by equipment type"),
 ) -> ExerciseList:
     """
-    List all exercises for the current trainer with optional filters.
+    List global exercises plus those owned by the current trainer with optional filters.
     """
-    stmt = select(Exercise).where(Exercise.trainer_id == current_trainer.id)
+    stmt = select(Exercise).where(
+        (Exercise.trainer_id == current_trainer.id) | (Exercise.trainer_id.is_(None))
+    )
 
     # Apply filters
     if q:
         # Case-insensitive search compatible with SQLite
         stmt = stmt.where(func.lower(Exercise.name).contains(q.lower()))
-    
+
     if primary_muscle_id is not None:
         stmt = stmt.where(Exercise.primary_muscle_id == primary_muscle_id)
-    
+
     if movement_pattern:
         stmt = stmt.where(Exercise.movement_pattern == movement_pattern)
-    
+
     if equipment:
         stmt = stmt.where(Exercise.equipment == equipment)
 
     result = db.execute(stmt.order_by(Exercise.name))
     exercises = result.scalars().all()
-    
+
+    for ex in exercises:
+        ex.is_mine = ex.trainer_id == current_trainer.id
+
     return ExerciseList(items=list(exercises))
 
 
@@ -84,7 +89,9 @@ async def get_exercise(
     """
     Get a single exercise by ID, scoped to the current trainer.
     """
-    return _get_exercise_or_404(exercise_id, db, current_trainer.id)
+    exercise = _get_exercise_or_404(exercise_id, db, current_trainer.id)
+    exercise.is_mine = exercise.trainer_id == current_trainer.id
+    return exercise
 
 
 @router.post("/", response_model=ExerciseRead, status_code=status.HTTP_201_CREATED)
@@ -96,15 +103,14 @@ async def create_exercise(
     """
     Create a new exercise for the current trainer.
     """
-    exercise = Exercise(
-    trainer_id=current_trainer.id,
-    **payload.model_dump(exclude={"secondary_muscle_ids"}),
-)
+    data = payload.model_dump(exclude={"secondary_muscle_ids"})
+    exercise = Exercise(trainer_id=current_trainer.id, **data)
 
     
     db.add(exercise)
     db.commit()
     db.refresh(exercise)
+    exercise.is_mine = True
     return exercise
 
 
@@ -120,12 +126,13 @@ async def update_exercise(
     """
     exercise = _get_exercise_or_404(exercise_id, db, current_trainer.id)
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True, exclude={"secondary_muscle_ids"}).items():
         setattr(exercise, field, value)
 
     db.add(exercise)
     db.commit()
     db.refresh(exercise)
+    exercise.is_mine = exercise.trainer_id == current_trainer.id
     return exercise
 
 
@@ -171,25 +178,6 @@ def seed_default_exercises(
     return SeedDefaultsResponse(created=created, skipped=skipped, total_after=total_after)
 
 
-@router.get("/metadata")
-async def exercises_metadata(
-    db: DBSessionDep,
-    current_trainer: TrainerDep,
-) -> dict:
-    """
-    Return muscles (id + name) and allowed movement patterns for client-side forms.
-    """
-    result = db.execute(select(Muscle).order_by(Muscle.name))
-    muscles = [{"id": m.id, "name": m.name} for m in result.scalars().all()]
-
-    movement_patterns = [
-        {"key": mp.value, "label": mp.name.replace("_", " ").title()}
-        for mp in MovementPattern
-    ]
-
-    return {"muscles": muscles, "movement_patterns": movement_patterns}
-
-
 def _get_exercise_or_404(
     exercise_id: str,
     db: Session,
@@ -201,7 +189,7 @@ def _get_exercise_or_404(
     result = db.execute(
         select(Exercise).where(
             Exercise.id == exercise_id,
-            Exercise.trainer_id == trainer_id,
+            (Exercise.trainer_id == trainer_id) | (Exercise.trainer_id.is_(None)),
         )
     )
     exercise = result.scalar_one_or_none()

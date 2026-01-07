@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime, time
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import DBSessionDep, TrainerDep
@@ -424,12 +424,24 @@ async def update_workout(
 ) -> WorkoutRead:
     """
     Update an existing workout owned by the current trainer.
-    Only updates provided fields.
+    
+    Supports two modes:
+    1. Metadata-only update: Provide fields like title, date, status, etc. (no blocks field)
+    2. Full plan update: Provide blocks field to replace the entire workout structure
+    
+    When blocks are provided:
+    - Existing blocks and sets are deleted
+    - New structure is created from the payload
+    - All operations are transactional
     """
     workout = _get_workout_or_404(workout_id, db, current_trainer.id)
 
     update_data = payload.model_dump(exclude_unset=True)
-    # Normalize date field if present
+    
+    # Extract blocks if present (will handle separately)
+    blocks_data = update_data.pop("blocks", None)
+    
+    # Update metadata fields
     if "date" in update_data and update_data["date"] is not None:
         # Expect "YYYY-MM-DD" from frontend / Swagger.
         # Convert to datetime with no time component (00:00) in the current timezone/naive.
@@ -449,10 +461,91 @@ async def update_workout(
     for field, value in update_data.items():
         setattr(workout, field, value)
 
+    # Handle structural plan update if blocks provided
+    if blocks_data is not None:
+        # Delete existing blocks and sets using explicit SQL queries
+        # This is safer than relying on ORM cascade with SQLite FK constraints
+        
+        # Step 1: Delete all WorkoutSets for blocks belonging to this workout
+        # Use subquery to find block IDs, then delete sets
+        db.execute(
+            delete(WorkoutSet).where(
+                WorkoutSet.workout_block_id.in_(
+                    select(WorkoutBlock.id).where(WorkoutBlock.workout_id == workout.id)
+                )
+            )
+        )
+        
+        # Step 2: Delete all WorkoutBlocks for this workout
+        db.execute(
+            delete(WorkoutBlock).where(WorkoutBlock.workout_id == workout.id)
+        )
+        
+        # Step 3: Flush to execute the deletes
+        db.flush()
+        
+        # Validate and create new blocks and sets
+        if blocks_data:
+            # Collect all exercise IDs to validate in one query
+            exercise_ids = set()
+            for block in blocks_data:
+                for set_data in block.get("sets", []):
+                    exercise_ids.add(set_data.get("exercise_id"))
+            
+            # Validate all exercise IDs belong to trainer
+            if exercise_ids:
+                result = db.execute(
+                    select(Exercise).where(
+                        Exercise.id.in_(exercise_ids),
+                        Exercise.trainer_id == current_trainer.id
+                    )
+                )
+                valid_exercises = {ex.id for ex in result.scalars().all()}
+                invalid_exercises = exercise_ids - valid_exercises
+                
+                if invalid_exercises:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid exercise IDs (not found or not owned by trainer): {', '.join(invalid_exercises)}"
+                    )
+            
+            # Create new blocks and sets
+            for block_data in blocks_data:
+                block = WorkoutBlock(
+                    workout_id=workout.id,
+                    block_type=block_data.get("block_type"),
+                    sequence_index=block_data.get("sequence_index"),
+                    notes=block_data.get("notes"),
+                )
+                db.add(block)
+                db.flush()  # Flush to get the block ID
+                
+                # Create sets for this block
+                for set_data in block_data.get("sets", []):
+                    workout_set = WorkoutSet(
+                        workout_block_id=block.id,
+                        exercise_id=set_data.get("exercise_id"),
+                        set_index=set_data.get("set_index"),
+                        target_sets=set_data.get("target_sets"),
+                        target_reps_min=set_data.get("target_reps_min"),
+                        target_reps_max=set_data.get("target_reps_max"),
+                        target_load_type=set_data.get("target_load_type"),
+                        target_load_value=set_data.get("target_load_value"),
+                        rpe_target=set_data.get("rpe_target"),
+                        rest_seconds=set_data.get("rest_seconds"),
+                        tempo=set_data.get("tempo"),
+                        is_warmup=set_data.get("is_warmup", False),
+                        notes=set_data.get("notes"),
+                        prescription_text=set_data.get("prescription_text"),
+                    )
+                    db.add(workout_set)
+
     db.add(workout)
     db.commit()
     
-    # Reload with relationships
+    # Reload with relationships to get fresh instances
+    # This ensures deleted blocks are not referenced
+    db.expire(workout)
     result = db.execute(
         select(Workout)
         .where(Workout.id == workout.id)

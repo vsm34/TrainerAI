@@ -16,7 +16,8 @@ type Exercise = {
   unilateral: boolean;
   skill_level?: string | null;
   notes?: string | null;
-  trainer_id?: number | null;
+  trainer_id?: string | null;
+  is_mine?: boolean;
 };
 
 async function fetchExercises(): Promise<Exercise[]> {
@@ -90,8 +91,8 @@ export default function ExercisesPage() {
               {exercises
                 .filter((ex) => {
                   if (search && !ex.name.toLowerCase().includes(search.toLowerCase())) return false;
-                  if (filter === "mine") return ex.trainer_id != null;
-                  if (filter === "global") return ex.trainer_id == null;
+                  if (filter === "mine") return ex.is_mine === true;
+                  if (filter === "global") return ex.is_mine === false;
                   return true;
                 })
                 .map((ex) => (
@@ -114,18 +115,18 @@ export default function ExercisesPage() {
                     </div>
 
                     <div className="ml-3 flex shrink-0 items-center gap-2">
-                      {ex.trainer_id == null ? (
-                        <span className="rounded-full bg-emerald-600/20 px-2 py-0.5 text-[10px] text-emerald-300">
-                          Global
-                        </span>
-                      ) : (
+                      {ex.is_mine ? (
                         <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-[10px] text-blue-300">
                           Mine
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-600/20 px-2 py-0.5 text-[10px] text-emerald-300">
+                          Global
                         </span>
                       )}
 
                       {/* Edit only for trainer-owned exercises */}
-                      {ex.trainer_id != null && (
+                      {ex.is_mine && (
                         <a
                           href={`/exercises/${ex.id}`}
                           className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-200"
@@ -134,7 +135,7 @@ export default function ExercisesPage() {
                         </a>
                       )}
 
-                      {ex.trainer_id != null && (
+                      {ex.is_mine && (
                         <DeleteExerciseButton id={ex.id} />
                       )}
                     </div>

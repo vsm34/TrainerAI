@@ -39,6 +39,7 @@ class ExerciseUpdate(BaseModel):
 class ExerciseRead(ORMModel, ExerciseBase):
     id: str
     trainer_id: str | None = None
+    is_mine: bool = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
